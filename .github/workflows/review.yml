@@ -191,6 +191,14 @@ jobs:
           unset PKG_CONFIG_SYSROOT_DIR
           export PKG_CONFIG_PATH="$HOME/tools/mbedtls-aarch64/lib/pkgconfig:$HOME/tools/lws-aarch64-mbedtls/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 
+          test -f "$HOME/tools/lws-aarch64-mbedtls/lib/pkgconfig/libwebsockets.pc"
+          test -f "$HOME/tools/mbedtls-aarch64/include/mbedtls/ssl.h"
+          test -f "$HOME/tools/mbedtls-aarch64/lib/libmbedtls.so"
+          pkg-config --exists libwebsockets
+          echo "libwebsockets pkg-config data:"
+          pkg-config --cflags --libs libwebsockets
+
+          rm -rf build
           cmake -S . -B build \
             -DMBEDTLS_INCLUDE_DIR="$HOME/tools/mbedtls-aarch64/include" \
             -DMBEDTLS_LIB_DIR="$HOME/tools/mbedtls-aarch64/lib" \
