@@ -126,7 +126,8 @@ jobs:
           source /opt/tdx-xwayland/7.5.0/environment-setup-armv8a-tdx-linux
 
           mkdir -p "$HOME/tools"
-          git clone --depth 1 --branch v3.6.2 https://github.com/Mbed-TLS/mbedtls.git "$RUNNER_TEMP/mbedtls"
+          git clone --depth 1 --branch v3.6.2 --recurse-submodules https://github.com/Mbed-TLS/mbedtls.git "$RUNNER_TEMP/mbedtls"
+          git -C "$RUNNER_TEMP/mbedtls" submodule update --init --recursive
 
           cmake -S "$RUNNER_TEMP/mbedtls" -B "$RUNNER_TEMP/mbedtls/build" \
             -G Ninja \
