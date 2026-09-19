@@ -62,15 +62,25 @@ jobs:
             TOOLCHAIN_PATH="$RUNNER_TEMP/tdx-sdk/toolchain.sh"
           fi
 
-          if [ -z "$TOOLCHAIN_PATH" ]; then
-            echo "No Toradex SDK installer found in the repository or in TDX_TOOLCHAIN_URL."
-            echo "Add a downloadable .sh installer or store one under SDK_for_C_Compilation/."
-            exit 1
+          if [ -n "$TOOLCHAIN_PATH" ]; then
+            echo "Found Toradex SDK installer at: $TOOLCHAIN_PATH"
+            echo "TOOLCHAIN_PATH=$TOOLCHAIN_PATH" >> "$GITHUB_ENV"
+          else
+            echo "No Toradex SDK installer was found in the repository and no TDX_TOOLCHAIN_URL secret is configured."
+            echo "The workflow will skip the build until one of these is available:"
+            echo "  - a direct-download .sh installer inside SDK_for_C_Compilation/"
+            echo "  - a valid TDX_TOOLCHAIN_URL repository secret"
+            echo "TOOLCHAIN_PATH=" >> "$GITHUB_ENV"
           fi
 
-          echo "TOOLCHAIN_PATH=$TOOLCHAIN_PATH" >> "$GITHUB_ENV"
+      - name: Toolchain not available
+        if: ${{ env.TOOLCHAIN_PATH == '' }}
+        shell: bash
+        run: |
+          echo "Skipping build because the Toradex SDK installable is not available in this environment."
 
       - name: Install Toradex SDK
+        if: ${{ env.TOOLCHAIN_PATH != '' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -94,6 +104,7 @@ jobs:
           fi
 
       - name: Validate required dependency paths
+        if: ${{ env.TOOLCHAIN_PATH != '' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -110,6 +121,7 @@ jobs:
           done
 
       - name: Configure and build project
+        if: ${{ env.TOOLCHAIN_PATH != '' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -127,7 +139,7 @@ jobs:
           cmake --build build --parallel
 
       - name: Upload built artifact
-        if: success()
+        if: ${{ success() && env.TOOLCHAIN_PATH != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: controller_bridge
