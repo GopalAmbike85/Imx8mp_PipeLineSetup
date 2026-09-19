@@ -145,7 +145,14 @@ jobs:
         run: |
           set -euo pipefail
           source /opt/tdx-xwayland/7.5.0/environment-setup-armv8a-tdx-linux
+
+          test -f "$HOME/tools/mbedtls-aarch64/include/mbedtls/ssl.h"
+          test -f "$HOME/tools/mbedtls-aarch64/lib/libmbedtls.so"
+
           export PKG_CONFIG_PATH="$HOME/tools/mbedtls-aarch64/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          export CPPFLAGS="-I$HOME/tools/mbedtls-aarch64/include ${CPPFLAGS:-}"
+          export LDFLAGS="-L$HOME/tools/mbedtls-aarch64/lib -Wl,-rpath,$HOME/tools/mbedtls-aarch64/lib ${LDFLAGS:-}"
+          export CMAKE_PREFIX_PATH="$HOME/tools/mbedtls-aarch64:${CMAKE_PREFIX_PATH:-}"
 
           git clone --depth 1 --branch v4.3.5 https://github.com/warmcat/libwebsockets.git "$RUNNER_TEMP/libwebsockets"
 
