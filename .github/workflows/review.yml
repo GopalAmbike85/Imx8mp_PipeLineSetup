@@ -109,8 +109,7 @@ jobs:
             echo "Toradex SDK already installed at /opt/tdx-xwayland/7.5.0"
           else
             echo "Installing Toradex SDK..."
-            sudo bash "${TOOLCHAIN_PATH}" --prefix=/opt/tdx-xwayland/7.5.0 --mode unattended || \
-            sudo bash "${TOOLCHAIN_PATH}" --prefix=/opt/tdx-xwayland/7.5.0 -y
+            sudo bash "${TOOLCHAIN_PATH}" -y -d /opt/tdx-xwayland/7.5.0
           fi
 
           if [ ! -f /opt/tdx-xwayland/7.5.0/environment-setup-armv8a-tdx-linux ]; then
