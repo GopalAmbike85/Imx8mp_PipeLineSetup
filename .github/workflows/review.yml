@@ -204,7 +204,7 @@ jobs:
           for d in \
             "$HOME/tools/mbedtls-aarch64/lib/pkgconfig" \
             "$HOME/tools/mbedtls-aarch64/lib64/pkgconfig"; do
-            if [ -f "$d/mbedtls.pc" ]; then
+            if [ -f "$d/mbedtls.pc" ] || [ -f "$d/mbedcrypto.pc" ] || [ -f "$d/mbedx509.pc" ]; then
               MBEDTLS_PKGCONFIG_DIR="$d"
               break
             fi
@@ -214,10 +214,11 @@ jobs:
             echo "Missing pkg-config metadata for dependencies. Searched:"
             echo "  LWS: $HOME/tools/lws-aarch64-mbedtls/{lib,lib64}/pkgconfig"
             echo "  mbedTLS: $HOME/tools/mbedtls-aarch64/{lib,lib64}/pkgconfig"
-            ls -R "$HOME/tools" 2>/dev/null || true
+            find "$HOME/tools" -maxdepth 5 \( -name '*.pc' -o -name 'libmbedtls.so' -o -name 'libwebsockets.so' \) 2>/dev/null | sort || true
             exit 1
           fi
 
+          unset PKG_CONFIG_SYSROOT_DIR
           export PKG_CONFIG_PATH="$LWS_PKGCONFIG_DIR:$MBEDTLS_PKGCONFIG_DIR:${PKG_CONFIG_PATH:-}"
 
           test -f "$HOME/tools/lws-aarch64-mbedtls/lib/libwebsockets.so" || test -f "$HOME/tools/lws-aarch64-mbedtls/lib64/libwebsockets.so"
