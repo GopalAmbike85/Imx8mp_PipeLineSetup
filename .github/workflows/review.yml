@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Install build tooling
         shell: bash
@@ -35,6 +37,12 @@ jobs:
             pkg-config \
             curl \
             ca-certificates
+
+      - name: Pull Git LFS assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git lfs pull
 
       - name: Resolve Toradex toolchain installer
         shell: bash
@@ -49,6 +57,13 @@ jobs:
             "${GITHUB_WORKSPACE}/SDK_for_C_Compilation/tdx-xwayland-glibc-x86_64-cnr-image-ml-armv8a-verdin-imx8mp-toolchain-7.5.0.sh" \
             ${GITHUB_WORKSPACE}/SDK_for_C_Compilation/*.sh; do
             if [ -f "$candidate" ]; then
+              if head -n 3 "$candidate" | grep -q "git-lfs.github.com/spec/v1"; then
+                echo "Git LFS pointer detected in $candidate."
+                echo "This means the real binary was not uploaded to Git LFS or is not available in the checkout."
+                echo "Run: git lfs install && git lfs push origin <branch> --all"
+                echo "Then push the real .sh installer to SDK_for_C_Compilation/."
+                exit 1
+              fi
               TOOLCHAIN_PATH="$candidate"
               break
             fi
