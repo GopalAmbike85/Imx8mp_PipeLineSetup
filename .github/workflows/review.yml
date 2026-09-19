@@ -189,12 +189,45 @@ jobs:
           source /opt/tdx-xwayland/7.5.0/environment-setup-armv8a-tdx-linux
 
           unset PKG_CONFIG_SYSROOT_DIR
-          export PKG_CONFIG_PATH="$HOME/tools/mbedtls-aarch64/lib/pkgconfig:$HOME/tools/lws-aarch64-mbedtls/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 
-          test -f "$HOME/tools/lws-aarch64-mbedtls/lib/pkgconfig/libwebsockets.pc"
+          LWS_PKGCONFIG_DIR=""
+          for d in \
+            "$HOME/tools/lws-aarch64-mbedtls/lib/pkgconfig" \
+            "$HOME/tools/lws-aarch64-mbedtls/lib64/pkgconfig"; do
+            if [ -f "$d/libwebsockets.pc" ]; then
+              LWS_PKGCONFIG_DIR="$d"
+              break
+            fi
+          done
+
+          MBEDTLS_PKGCONFIG_DIR=""
+          for d in \
+            "$HOME/tools/mbedtls-aarch64/lib/pkgconfig" \
+            "$HOME/tools/mbedtls-aarch64/lib64/pkgconfig"; do
+            if [ -f "$d/mbedtls.pc" ]; then
+              MBEDTLS_PKGCONFIG_DIR="$d"
+              break
+            fi
+          done
+
+          if [ -z "$LWS_PKGCONFIG_DIR" ] || [ -z "$MBEDTLS_PKGCONFIG_DIR" ]; then
+            echo "Missing pkg-config metadata for dependencies. Searched:"
+            echo "  LWS: $HOME/tools/lws-aarch64-mbedtls/{lib,lib64}/pkgconfig"
+            echo "  mbedTLS: $HOME/tools/mbedtls-aarch64/{lib,lib64}/pkgconfig"
+            ls -R "$HOME/tools" 2>/dev/null || true
+            exit 1
+          fi
+
+          export PKG_CONFIG_PATH="$LWS_PKGCONFIG_DIR:$MBEDTLS_PKGCONFIG_DIR:${PKG_CONFIG_PATH:-}"
+
+          test -f "$HOME/tools/lws-aarch64-mbedtls/lib/libwebsockets.so" || test -f "$HOME/tools/lws-aarch64-mbedtls/lib64/libwebsockets.so"
           test -f "$HOME/tools/mbedtls-aarch64/include/mbedtls/ssl.h"
-          test -f "$HOME/tools/mbedtls-aarch64/lib/libmbedtls.so"
-          pkg-config --exists libwebsockets
+          test -f "$HOME/tools/mbedtls-aarch64/lib/libmbedtls.so" || test -f "$HOME/tools/mbedtls-aarch64/lib64/libmbedtls.so"
+
+          pkg-config --exists libwebsockets || {
+            echo "pkg-config could not resolve libwebsockets from $PKG_CONFIG_PATH"
+            exit 1
+          }
           echo "libwebsockets pkg-config data:"
           pkg-config --cflags --libs libwebsockets
 
