@@ -1,0 +1,135 @@
+name: Review
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  review:
+    name: Build review
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            pkg-config \
+            curl \
+            ca-certificates
+
+      - name: Resolve Toradex toolchain installer
+        shell: bash
+        env:
+          TDX_TOOLCHAIN_URL: ${{ secrets.TDX_TOOLCHAIN_URL }}
+        run: |
+          set -euo pipefail
+
+          TOOLCHAIN_PATH=""
+
+          for candidate in \
+            "${GITHUB_WORKSPACE}/SDK_for_C_Compilation/tdx-xwayland-glibc-x86_64-cnr-image-ml-armv8a-verdin-imx8mp-toolchain-7.5.0.sh" \
+            ${GITHUB_WORKSPACE}/SDK_for_C_Compilation/*.sh; do
+            if [ -f "$candidate" ]; then
+              TOOLCHAIN_PATH="$candidate"
+              break
+            fi
+          done
+
+          if [ -z "$TOOLCHAIN_PATH" ] && [ -n "${TDX_TOOLCHAIN_URL:-}" ]; then
+            mkdir -p "$RUNNER_TEMP/tdx-sdk"
+            curl -L --fail --retry 3 \
+              -o "$RUNNER_TEMP/tdx-sdk/toolchain.sh" \
+              "$TDX_TOOLCHAIN_URL"
+            TOOLCHAIN_PATH="$RUNNER_TEMP/tdx-sdk/toolchain.sh"
+          fi
+
+          if [ -z "$TOOLCHAIN_PATH" ]; then
+            echo "No Toradex SDK installer found in the repository or in TDX_TOOLCHAIN_URL."
+            echo "Add a downloadable .sh installer or store one under SDK_for_C_Compilation/."
+            exit 1
+          fi
+
+          echo "TOOLCHAIN_PATH=$TOOLCHAIN_PATH" >> "$GITHUB_ENV"
+
+      - name: Install Toradex SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -n "${TOOLCHAIN_PATH:-}"
+          chmod +x "${TOOLCHAIN_PATH}"
+
+          sudo mkdir -p /opt/tdx-xwayland
+
+          if [ -f /opt/tdx-xwayland/7.5.0/environment-setup-armv8a-tdx-linux ]; then
+            echo "Toradex SDK already installed at /opt/tdx-xwayland/7.5.0"
+          else
+            echo "Installing Toradex SDK..."
+            sudo bash "${TOOLCHAIN_PATH}" --prefix=/opt/tdx-xwayland/7.5.0 --mode unattended || \
+            sudo bash "${TOOLCHAIN_PATH}" --prefix=/opt/tdx-xwayland/7.5.0 -y
+          fi
+
+          if [ ! -f /opt/tdx-xwayland/7.5.0/environment-setup-armv8a-tdx-linux ]; then
+            echo "::error::The Toradex SDK installer did not create the expected environment script."
+            exit 1
+          fi
+
+      - name: Validate required dependency paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          source /opt/tdx-xwayland/7.5.0/environment-setup-armv8a-tdx-linux
+
+          for path in \
+            "$HOME/tools/lws-aarch64-mbedtls/lib/pkgconfig/libwebsockets.pc" \
+            "$HOME/tools/mbedtls-aarch64/include/mbedtls/ssl.h" \
+            "$HOME/tools/mbedtls-aarch64/lib/libmbedtls.so" \
+            "/opt/tdx-xwayland/7.5.0/sysroots/armv8a-tdx-linux/usr/include/tensorflow/lite"; do
+            if [ ! -e "$path" ]; then
+              echo "::warning::Missing expected dependency: $path"
+            fi
+          done
+
+      - name: Configure and build project
+        shell: bash
+        run: |
+          set -euo pipefail
+          source /opt/tdx-xwayland/7.5.0/environment-setup-armv8a-tdx-linux
+
+          unset PKG_CONFIG_SYSROOT_DIR
+          export PKG_CONFIG_PATH="$HOME/tools/lws-aarch64-mbedtls/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+
+          cmake -S . -B build \
+            -DMBEDTLS_INCLUDE_DIR="$HOME/tools/mbedtls-aarch64/include" \
+            -DMBEDTLS_LIB_DIR="$HOME/tools/mbedtls-aarch64/lib" \
+            -DTFLITE_INCLUDE_DIR="/opt/tdx-xwayland/7.5.0/sysroots/armv8a-tdx-linux/usr/include" \
+            -DTFLITE_LIB_DIR="/opt/tdx-xwayland/7.5.0/sysroots/armv8a-tdx-linux/usr/lib"
+
+          cmake --build build --parallel
+
+      - name: Upload built artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: controller_bridge
+          path: build/controller_bridge
+          if-no-files-found: error
