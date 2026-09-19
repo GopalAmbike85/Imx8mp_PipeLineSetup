@@ -166,7 +166,11 @@ jobs:
             -DLWS_WITHOUT_TESTAPPS=ON \
             -DLWS_WITHOUT_TEST_SERVER=ON \
             -DCMAKE_INSTALL_PREFIX="$HOME/tools/lws-aarch64-mbedtls" \
-            -DCMAKE_PREFIX_PATH="$HOME/tools/mbedtls-aarch64"
+            -DCMAKE_PREFIX_PATH="$HOME/tools/mbedtls-aarch64" \
+            -DMBEDTLS_ROOT_DIR="$HOME/tools/mbedtls-aarch64" \
+            -DMBEDTLS_INCLUDE_DIR="$HOME/tools/mbedtls-aarch64/include" \
+            -DMBEDTLS_LIBRARY="$HOME/tools/mbedtls-aarch64/lib/libmbedtls.so" \
+            -DMBEDTLS_LIBRARIES="$HOME/tools/mbedtls-aarch64/lib/libmbedtls.so;$HOME/tools/mbedtls-aarch64/lib/libmbedx509.so;$HOME/tools/mbedtls-aarch64/lib/libmbedcrypto.so"
 
           cmake --build "$RUNNER_TEMP/libwebsockets/build" --parallel
           cmake --install "$RUNNER_TEMP/libwebsockets/build"
