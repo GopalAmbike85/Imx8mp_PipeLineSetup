@@ -23,8 +23,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Install build tooling
         shell: bash
@@ -34,15 +32,11 @@ jobs:
           sudo apt-get install -y \
             build-essential \
             cmake \
+            ninja-build \
             pkg-config \
             curl \
-            ca-certificates
-
-      - name: Pull Git LFS assets
-        shell: bash
-        run: |
-          set -euo pipefail
-          git lfs pull
+            ca-certificates \
+            git
 
       - name: Resolve Toradex toolchain installer
         shell: bash
@@ -57,13 +51,6 @@ jobs:
             "${GITHUB_WORKSPACE}/SDK_for_C_Compilation/tdx-xwayland-glibc-x86_64-cnr-image-ml-armv8a-verdin-imx8mp-toolchain-7.5.0.sh" \
             ${GITHUB_WORKSPACE}/SDK_for_C_Compilation/*.sh; do
             if [ -f "$candidate" ]; then
-              if head -n 3 "$candidate" | grep -q "git-lfs.github.com/spec/v1"; then
-                echo "Git LFS pointer detected in $candidate."
-                echo "This means the real binary was not uploaded to Git LFS or is not available in the checkout."
-                echo "Run: git lfs install && git lfs push origin <branch> --all"
-                echo "Then push the real .sh installer to SDK_for_C_Compilation/."
-                exit 1
-              fi
               TOOLCHAIN_PATH="$candidate"
               break
             fi
@@ -117,6 +104,51 @@ jobs:
             exit 1
           fi
 
+      - name: Build mbedTLS for target
+        if: ${{ env.TOOLCHAIN_PATH != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          source /opt/tdx-xwayland/7.5.0/environment-setup-armv8a-tdx-linux
+
+          mkdir -p "$HOME/tools"
+          git clone --depth 1 --branch v3.6.2 https://github.com/Mbed-TLS/mbedtls.git "$RUNNER_TEMP/mbedtls"
+
+          cmake -S "$RUNNER_TEMP/mbedtls" -B "$RUNNER_TEMP/mbedtls/build" \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DENABLE_PROGRAMS=OFF \
+            -DENABLE_TESTING=OFF \
+            -DCMAKE_INSTALL_PREFIX="$HOME/tools/mbedtls-aarch64"
+
+          cmake --build "$RUNNER_TEMP/mbedtls/build" --parallel
+          cmake --install "$RUNNER_TEMP/mbedtls/build"
+
+      - name: Build libwebsockets with mbedTLS support
+        if: ${{ env.TOOLCHAIN_PATH != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          source /opt/tdx-xwayland/7.5.0/environment-setup-armv8a-tdx-linux
+          export PKG_CONFIG_PATH="$HOME/tools/mbedtls-aarch64/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+
+          git clone --depth 1 --branch v4.3.5 https://github.com/warmcat/libwebsockets.git "$RUNNER_TEMP/libwebsockets"
+
+          cmake -S "$RUNNER_TEMP/libwebsockets" -B "$RUNNER_TEMP/libwebsockets/build" \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DLWS_WITH_MBEDTLS=ON \
+            -DLWS_WITH_SSL=ON \
+            -DLWS_WITH_SHARED=ON \
+            -DLWS_WITH_STATIC=OFF \
+            -DLWS_WITHOUT_TESTAPPS=ON \
+            -DLWS_WITHOUT_TEST_SERVER=ON \
+            -DCMAKE_INSTALL_PREFIX="$HOME/tools/lws-aarch64-mbedtls" \
+            -DCMAKE_PREFIX_PATH="$HOME/tools/mbedtls-aarch64"
+
+          cmake --build "$RUNNER_TEMP/libwebsockets/build" --parallel
+          cmake --install "$RUNNER_TEMP/libwebsockets/build"
+
       - name: Validate required dependency paths
         if: ${{ env.TOOLCHAIN_PATH != '' }}
         shell: bash
@@ -142,7 +174,7 @@ jobs:
           source /opt/tdx-xwayland/7.5.0/environment-setup-armv8a-tdx-linux
 
           unset PKG_CONFIG_SYSROOT_DIR
-          export PKG_CONFIG_PATH="$HOME/tools/lws-aarch64-mbedtls/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          export PKG_CONFIG_PATH="$HOME/tools/mbedtls-aarch64/lib/pkgconfig:$HOME/tools/lws-aarch64-mbedtls/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 
           cmake -S . -B build \
             -DMBEDTLS_INCLUDE_DIR="$HOME/tools/mbedtls-aarch64/include" \
