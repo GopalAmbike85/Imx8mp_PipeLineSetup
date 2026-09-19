@@ -1,0 +1,44 @@
+# CMake out-of-tree build directories (see BuildProcess.md to regenerate)
+/build/
+/build-*/
+
+# Compiled diagnostic tool binaries under tools/ - only their .c/.cpp sources
+# are tracked; rebuild via BuildProcess.md. Add a line here for any new
+# standalone tool added under tools/<name>/.
+/tools/ntp_sniffer/ntp_sniffer
+/tools/ntp_sniffer/ntp_sniffer_stripped
+
+# Generic build artifacts, in case a build ever runs in-tree
+*.o
+*.obj
+*.a
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# NOT ignoring *.so/*.so.* - this project doesn't build shared libs itself,
+# and deploy/*.so.* are deliberately tracked runtime dependencies (see
+# BuildProcess.md 5.2a), not build output.
+
+# deploy/ tracks a fixed, deliberate set of runtime files (mbedTLS/lws libs,
+# cert/key - see BuildProcess.md 5.2a) - NOT the binary itself, which is
+# per-build output. Don't let a `cp .../controller_bridge deploy/` typo end
+# up tracked.
+/deploy/controller_bridge
+
+# Packaging archives assembled locally for a TFTP push - never tracked,
+# see BuildProcess.md 5.2a for how to regenerate one.
+*.tar
+*.tar.gz
+
+# Per-frame diagnostic logs / CSVs produced by running binaries on-device -
+# these are runtime output, not source, and are board-local anyway
+*.log
+timing_log.csv
+
+# Editor / OS cruft
+*.swp
+*~
+.DS_Store
+Thumbs.db

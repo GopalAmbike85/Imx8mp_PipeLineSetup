@@ -1,0 +1,23 @@
+[Unit]
+Description=CNR ControllerBridge (motor inference WebSocket bridge)
+# network-online.target itself never activates on this board (no
+# networkd-wait-online/NetworkManager-wait-online wired up here) - a
+# dependency on it blocks this service indefinitely rather than just
+# ordering after it. end0-network.service (Toradex's own DHCP bring-up
+# unit) is the real thing that configures the interface, and this is a
+# soft ordering (After= only, no Wants=/Requires=) so a slow/failed DHCP
+# doesn't block the service from starting - the app itself tolerates
+# starting before the network is fully up (it just won't accept real
+# connections until DHCP completes).
+After=end0-network.service
+
+[Service]
+Type=simple
+WorkingDirectory=/root/tls_deploy
+Environment=LD_LIBRARY_PATH=.
+ExecStart=/root/tls_deploy/controller_bridge 8081 8080 pc_server.crt pc_server.key TfLSTM_l2_w128_s20_int8.tflite /usr/lib/libvx_delegate.so timing_log.csv
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
